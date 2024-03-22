@@ -30,13 +30,16 @@ class TextLoader():
         with codecs.open(input_file, "r", encoding=self.encoding) as f:
             data = f.read()
         counter = collections.Counter(data)
+        counter.update(['<S>'])  # Add start token
+        counter.update(['</S>'])  # Add end token
+        counter.update(['UNK'])  # Add unknown token
         count_pairs = sorted(counter.items(), key=lambda x: -x[1])
         self.chars, _ = zip(*count_pairs)
         self.vocab_size = len(self.chars)
         self.vocab = dict(zip(self.chars, range(len(self.chars))))
         with open(vocab_file, 'wb') as f:
             cPickle.dump(self.chars, f)
-        self.tensor = np.array(list(map(self.vocab.get, data)))
+        self.tensor = np.array(list(map(self.vocab.get, ['<S>'] + list(data) + ['</S>'])))
         np.save(tensor_file, self.tensor)
 
 

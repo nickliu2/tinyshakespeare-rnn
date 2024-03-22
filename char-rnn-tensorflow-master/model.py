@@ -1,9 +1,8 @@
 import tensorflow as tf
 from tensorflow.contrib import rnn
 from tensorflow.contrib import legacy_seq2seq
-
+from tensorflow.contrib.rnn import LSTMStateTuple
 import numpy as np
-
 
 class Model():
     def __init__(self, args, training=True):
@@ -14,7 +13,7 @@ class Model():
 
         # choose different rnn cell 
         if args.model == 'rnn':
-            cell_fn = rnn.RNNCell
+            cell_fn = rnn.BasicRNNCell
         elif args.model == 'gru':
             cell_fn = rnn.GRUCell
         elif args.model == 'lstm':
@@ -41,6 +40,12 @@ class Model():
         self.targets = tf.placeholder(
             tf.int32, [args.batch_size, args.seq_length])
         self.initial_state = cell.zero_state(args.batch_size, tf.float32)
+        # if isinstance(self.cell.state_size, tuple):
+        #     # For LSTMCells, state_size is a tuple.
+        #     self.initial_state = tuple(tf.compat.v1.placeholder_with_default(tf.zeros([args.batch_size, state_size]), [None, state_size]) for state_size in self.cell.state_size)
+        # else:
+        #     # For GRUCell and RNNCell, state_size is a single value.
+        #     self.initial_state = tf.compat.v1.placeholder_with_default(tf.zeros([args.batch_size, self.cell.state_size]), [None, self.cell.state_size])
 
         # softmax output layer, use softmax to classify
         with tf.variable_scope('rnnlm'):
@@ -72,7 +77,8 @@ class Model():
 
         # output layer
         self.logits = tf.matmul(output, softmax_w) + softmax_b
-        self.probs = None
+        # self.probs = tf.nn.softmax(self.logits)
+        self.probs = None # need to wait until temperature is specified before computing this
 
         # loss is calculate by the log loss and taking the average.
         loss = legacy_seq2seq.sequence_loss_by_example(
@@ -98,6 +104,8 @@ class Model():
         # tf.summary.histogram('logits', self.logits)
         # tf.summary.histogram('loss', loss)
         tf.summary.scalar('train_loss', self.cost)
+        self.perplexity = tf.exp(self.cost)
+        tf.summary.scalar('perplexity', self.perplexity)
 
     def sample(self, sess, chars, vocab, num=200, prime='The ', sampling_type=1, temperature=1.):
         self.probs = tf.nn.softmax(tf.div(self.logits, temperature))
